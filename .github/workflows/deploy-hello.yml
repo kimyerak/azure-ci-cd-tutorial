@@ -1,0 +1,22 @@
+name: deploy-hello-to-azure
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (optional for this flow)
+        uses: actions/checkout@v4
+
+      # App Service for Containers 배포: Docker Hub의 공개 이미지를 그대로 사용
+      - name: Deploy to Azure Web App (Container)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+          images: index.docker.io/nginxdemos/hello:latest
