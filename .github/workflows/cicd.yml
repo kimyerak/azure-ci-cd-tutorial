@@ -1,11 +1,23 @@
 name: build-and-deploy
+
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+  workflow_dispatch:
+
+# 동시에 두 번 배포되지 않도록 보호
+concurrency:
+  group: webapp-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Docker Hub 이미지 경로: your-docker-name를 계정/Org로 바꾸세요
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hello-app
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,17 +35,26 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # linux/amd64로 빌드해 App Service와 아키텍처 호환 보장
       - name: Build and push (immutable tag)
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/hello-app:${{ steps.vars.outputs.TAG }} \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/hello-app:latest \
-            --push .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            index.docker.io/${{ env.DOCKER_IMAGE }}:${{ steps.vars.outputs.TAG }}
+            index.docker.io/${{ env.DOCKER_IMAGE }}:latest
 
+      # Publish Profile로 인증하므로 azure/login 불필요
       - name: Deploy to Azure Web App (container)
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}   # 포털에서 다운받은 XML 전체
-          images: index.docker.io/${{ secrets.DOCKERHUB_USERNAME }}/hello-app:${{ steps.vars.outputs.TAG }}
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+          images: index.docker.io/${{ env.DOCKER_IMAGE }}:${{ steps.vars.outputs.TAG }}
+
+      - name: Post logout Docker Hub
+        if: always()
+        run: docker logout
