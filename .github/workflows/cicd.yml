@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Docker Hub 이미지 경로: your-docker-name를 계정/Org로 바꾸세요
+  # Docker Hub 이미지 경로
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hello-app
 
 jobs:
